@@ -1,0 +1,232 @@
+import java.util.*;
+
+class Cliente {
+    String id;
+    String nombre;
+    String correo;
+    String direccion;
+    List<String> pedidos = new ArrayList<>();
+
+    public Cliente(String nombre, String correo, String direccion) {
+        this.id = UUID.randomUUID().toString();
+        this.nombre = nombre;
+        this.correo = correo;
+        this.direccion = direccion;
+    }
+}
+
+class Producto {
+    String id;
+    String nombre;
+    String descripcion;
+    double precio;
+    int cantidad;
+    String categoria;
+
+    public Producto(String nombre, String descripcion, double precio, int cantidad, String categoria) {
+        this.id = UUID.randomUUID().toString();
+        this.nombre = nombre;
+        this.descripcion = descripcion;
+        this.precio = precio;
+        this.cantidad = cantidad;
+        this.categoria = categoria;
+    }
+}
+
+class Pedido {
+    String id;
+    String clienteId;
+    Map<String, Integer> productos = new HashMap<>();
+    String estado = "Pendiente";
+    double total = 0.0;
+
+    public Pedido(String clienteId) {
+        this.id = UUID.randomUUID().toString();
+        this.clienteId = clienteId;
+    }
+}
+
+class Pago {
+    String pedidoId;
+    String metodo;
+    boolean exito;
+    String comprobante;
+
+    public Pago(String pedidoId, String metodo, boolean exito) {
+        this.pedidoId = pedidoId;
+        this.metodo = metodo;
+        this.exito = exito;
+        this.comprobante = UUID.randomUUID().toString();
+    }
+}
+
+class Envio {
+    String pedidoId;
+    String direccion;
+    String estado = "Pendiente";
+    String tracking;
+
+    public Envio(String pedidoId, String direccion) {
+        this.pedidoId = pedidoId;
+        this.direccion = direccion;
+        this.tracking = UUID.randomUUID().toString();
+    }
+}
+
+public class Tiendasus {
+    Map<String, Cliente> clientes = new HashMap<>();
+    Map<String, Producto> productos = new HashMap<>();
+    Map<String, Pedido> pedidos = new HashMap<>();
+    Map<String, Pago> pagos = new HashMap<>();
+    Map<String, Envio> envios = new HashMap<>();
+    Scanner scanner = new Scanner(System.in);
+    Cliente clienteActual;
+
+    public static void main(String[] args) {
+        Tiendasus tienda = new Tiendasus();
+        tienda.iniciar();
+    }
+
+    public void iniciar() {
+        System.out.println("Bienvenido a la Tiendasus");
+        System.out.print("Ingresa tu correo para continuar: ");
+        String correo = scanner.nextLine();
+
+        if (clientes.containsKey(correo)) {
+            clienteActual = clientes.get(correo);
+            System.out.println("Bienvenido de nuevo, " + clienteActual.nombre);
+        } else {
+            System.out.println("Registro:");
+            System.out.print("-Nombre: ");
+            String nombre = scanner.nextLine();
+            System.out.print("-Dirección: ");
+            String direccion = scanner.nextLine();
+            clienteActual = new Cliente(nombre, correo, direccion);
+            clientes.put(correo, clienteActual);
+        }
+
+        int opcion;
+        do {
+            System.out.println("\n1 Agregar producto");
+            System.out.println("2 Buscar producto");
+            System.out.println("3 Crear pedido");
+            System.out.println("4 Agregar producto a pedido");
+            System.out.println("5 Confirmar pago");
+            System.out.println("6 Rastrear envío");
+            System.out.println("7 Ver historial de pedidos");
+            System.out.println("0 Salir");
+            System.out.print("Seleccione una opción: ");
+            opcion = Integer.parseInt(scanner.nextLine());
+
+            switch (opcion) {
+                case 1 -> agregarProducto();
+                case 2 -> buscarProducto();
+                case 3 -> crearPedido();
+                case 4 -> agregarAlPedido();
+                case 5 -> pagarPedido();
+                case 6 -> rastrearEnvio();
+                case 7 -> verHistorial();
+            }
+        } while (opcion != 0);
+    }
+
+    void agregarProducto() {
+        System.out.print("Nombre: ");
+        String nombre = scanner.nextLine();
+        System.out.print("Descripción: ");
+        String descripcion = scanner.nextLine();
+        System.out.print("Precio: ");
+        double precio = Double.parseDouble(scanner.nextLine());
+        System.out.print("Cantidad: ");
+        int cantidad = Integer.parseInt(scanner.nextLine());
+        System.out.print("Categoría: ");
+        String categoria = scanner.nextLine();
+        Producto p = new Producto(nombre, descripcion, precio, cantidad, categoria);
+        productos.put(p.id, p);
+        System.out.println("Producto agregado");
+    }
+
+    void buscarProducto() {
+        System.out.print("Nombre a buscar: ");
+        String nombre = scanner.nextLine();
+        System.out.print("Categoría (opcional): ");
+        String cat = scanner.nextLine();
+        productos.values().stream()
+            .filter(p -> p.nombre.toLowerCase().contains(nombre.toLowerCase()) && (cat.isEmpty() || p.categoria.equals(cat)))
+            .forEach(p -> System.out.println(p.id + " - " + p.nombre + " ($" + p.precio + ")"));
+    }
+
+    void crearPedido() {
+        Pedido pedido = new Pedido(clienteActual.id);
+        pedidos.put(pedido.id, pedido);
+        clienteActual.pedidos.add(pedido.id);
+        System.out.println("Pedido creado con ID: " + pedido.id);
+    }
+
+    void agregarAlPedido() {
+        System.out.print("ID del pedido: ");
+        String pid = scanner.nextLine();
+        Pedido pedido = pedidos.get(pid);
+        System.out.print("ID del producto: ");
+        String prid = scanner.nextLine();
+        Producto producto = productos.get(prid);
+        System.out.print("Cantidad: ");
+        int cantidad = Integer.parseInt(scanner.nextLine());
+        if (producto.cantidad >= cantidad) {
+            pedido.productos.put(prid, pedido.productos.getOrDefault(prid, 0) + cantidad);
+            producto.cantidad -= cantidad;
+            actualizarTotalPedido(pedido);
+            System.out.println("Producto agregado al pedido");
+        } else {
+            System.out.println("No hay suficiente inventario");
+        }
+    }
+
+    void actualizarTotalPedido(Pedido pedido) {
+        double total = 0;
+        for (var entry : pedido.productos.entrySet()) {
+            Producto p = productos.get(entry.getKey());
+            total += p.precio * entry.getValue();
+        }
+        pedido.total = total * 1.1;//iva (10% esta bien¿?) 
+    }
+
+    void pagarPedido() {
+        System.out.print("ID del pedido: ");
+        String pid = scanner.nextLine();
+        Pedido pedido = pedidos.get(pid);
+        System.out.print("Método de pago (Tarjeta/PayPal/Transferencia): ");
+        String metodo = scanner.nextLine();
+        Pago pago = new Pago(pid, metodo, true);
+        pagos.put(pid, pago);
+        pedido.estado = "Confirmado";
+        generarEnvio(pid);
+        System.out.println("Pago realizado con comprobante: " + pago.comprobante);
+    }
+
+    void generarEnvio(String pid) {
+        Pedido pedido = pedidos.get(pid);
+        Envio envio = new Envio(pid, clienteActual.direccion);
+        envios.put(pid, envio);
+        pedido.estado = "Enviado";
+        System.out.println("Envío generado con tracking: " + envio.tracking);
+    }
+
+    void rastrearEnvio() {
+        System.out.print("ID del pedido: ");
+        String pid = scanner.nextLine();
+        Envio envio = envios.get(pid);
+        if (envio != null) {
+            System.out.println("Estado: " + envio.estado + ", Tracking: " + envio.tracking);
+        } else {
+            System.out.println("No se encontró el envío");
+        }
+    }
+
+    void verHistorial() {
+        for (String pid : clienteActual.pedidos) {
+            Pedido p = pedidos.get(pid);
+            System.out.println("Pedido " + pid + " - Estado: " + p.estado + " - Total: $" + p.total);
+        }
+    }
+}
